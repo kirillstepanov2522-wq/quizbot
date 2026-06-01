@@ -1,3 +1,5 @@
+from rebus_builder import expression_to_blocks, draw_rebus_from_blocks
+from io import BytesIO
 import json
 import random
 import sqlite3
@@ -9,7 +11,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ===== НАСТРОЙКИ =====
-TOKEN = ""
+TOKEN = "8798378718:AAGRxt_IwUR0m8a2M97l-5TPn8PhWpcNL9s"
 ADMIN_ID = 5206039766
 QUIZ_FILE = "quizzes.json"
 
@@ -634,6 +636,59 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Файл базы данных не найден")
 
+@antispam_decorator
+async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Список готовых ребусов (ответ = выражение)
+    rebus_list = [
+        {"expr": "кар^1+вниз^1[з=р]", "answer": "арнир", "length": 6},
+        {"expr": "лиса~", "answer": "асил", "length": 4},
+        {"expr": "том[т=д]~", "answer": "мод", "length": 3},
+        {"expr": "рэй^1$1+воланд^1$2", "answer": "эол", "length": 3},
+        # Добавь свои ребусы сюда
+    ]
+    
+    r = random.choice(rebus_list)
+    expression = r["expr"]
+    answer = r["answer"]
+    word_length = r["length"]
+    
+    # Парсим выражение в блоки
+    blocks_data = expression_to_blocks(expression)
+    
+    if not blocks_data:
+        await update.message.reply_text("❌ Ошибка генерации ребуса")
+        return
+    
+    # Генерируем картинку в памяти
+    img = draw_rebus_from_blocks(
+        blocks_data,
+        images_dir="images",
+        font_path="fonts/minecraft.ttf",  # путь к шрифту
+        frame_text="ТРЯСЛО993",
+        frame_padding=30,
+        letter_spacing_h=5,
+        letter_spacing_v=7
+    )
+    
+    if not img:
+        await update.message.reply_text("❌ Ошибка создания картинки. Возможно, нет картинок в папке images/")
+        return
+    
+    # Сохраняем в BytesIO
+    bio = BytesIO()
+    img.save(bio, format="PNG")
+    bio.seek(0)
+    
+    # Отправляем фото с подсказкой
+    caption = f"🧩 *Отгадай слово ({word_length} букв)*\n\nПодсказка: ответ начинается с буквы «{answer[0]}»"
+    
+    await update.message.reply_photo(
+        photo=bio,
+        caption=caption,
+        parse_mode="Markdown"
+    )
+
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -653,6 +708,7 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(quiz_completed, pattern="quiz_completed"))
     app.add_handler(CallbackQueryHandler(fastqz_completed, pattern="fastqz_completed"))
     app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("rebus", rebus))
     
     print("✅ Бот запущен!")
     app.run_polling()
