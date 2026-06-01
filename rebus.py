@@ -230,3 +230,116 @@ def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", f
     if output_path:
         combined.save(output_path)
     return combined
+
+# ========== РАБОТА С БАЗОЙ СЛОВ ==========
+def load_dictionary(filepath: str = "words.txt") -> set:
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            words = set()
+            for line in f:
+                raw = line.strip()
+                if not raw:
+                    continue
+                cleaned = raw.replace(" ", "").lower()
+                words.add(cleaned)
+        print(f"📚 Загружено {len(words)} слов из {filepath}")
+        return words
+    except FileNotFoundError:
+        print(f"⚠️ Файл {filepath} не найден. Использую пустой словарь.")
+        return set()
+
+def can_obtain_from(base_word: str, target: str, max_removals=2, allow_replace=True, allow_reverse=True) -> list:
+    results = []
+    if base_word == target:
+        results.append(f"{base_word}")
+    for l in range(1, max_removals+1):
+        if base_word[l:] == target:
+            results.append(f"{base_word}^{l}")
+    for r in range(1, max_removals+1):
+        if base_word[:-r] == target:
+            results.append(f"{base_word}${r}")
+    for l in range(1, max_removals+1):
+        for r in range(1, max_removals+1):
+            if l+r < len(base_word) and base_word[l:-r] == target:
+                results.append(f"{base_word}^{l}${r}")
+    if allow_replace and len(base_word) == len(target):
+        diff_positions = [i for i in range(len(base_word)) if base_word[i] != target[i]]
+        if len(diff_positions) == 1:
+            i = diff_positions[0]
+            results.append(f"{base_word}[{base_word[i]}={target[i]}]")
+    if allow_reverse and base_word[::-1] == target:
+        results.append(f"{base_word}~")
+    seen = set()
+    unique = []
+    for r in results:
+        if r not in seen:
+            seen.add(r)
+            unique.append(r)
+    return unique
+
+def split_into_parts(word: str, dictionary: set, excluded_words: set = None, max_removals=2, max_parts=3) -> list:
+    word = word.lower()
+    dictionary = {w.lower() for w in dictionary}
+    dictionary.discard(word)
+    if excluded_words:
+        dictionary -= excluded_words
+    variants = []
+    for parts_count in range(2, max_parts+1):
+        lengths = []
+        if parts_count == 2:
+            for i in range(1, len(word)):
+                lengths.append([i, len(word)-i])
+        elif parts_count == 3:
+            for i in range(1, len(word)-1):
+                for j in range(i+1, len(word)):
+                    lengths.append([i, j-i, len(word)-j])
+        for split_lengths in lengths:
+            parts = []
+            pos = 0
+            valid = True
+            for l in split_lengths:
+                part = word[pos:pos+l]
+                if not part:
+                    valid = False
+                    break
+                parts.append(part)
+                pos += l
+            if not valid:
+                continue
+            part_rules = []
+            for part in parts:
+                candidates = []
+                for dict_word in dictionary:
+                    rules = can_obtain_from(dict_word, part, max_removals, allow_replace=True, allow_reverse=True)
+                    for rule in rules:
+                        candidates.append((dict_word, rule))
+                if candidates:
+                    part_rules.append(candidates)
+                else:
+                    part_rules = None
+                    break
+            if part_rules and all(part_rules):
+                for combination in product(*part_rules):
+                    variant = {
+                        "parts": [c[1] for c in combination],
+                        "expression": " + ".join([c[1] for c in combination]),
+                        "full_word": word,
+                        "original_words": [c[0] for c in combination]
+                    }
+                    variants.append(variant)
+    seen_expr = set()
+    unique_variants = []
+    for v in variants:
+        if v["expression"] not in seen_expr:
+            seen_expr.add(v["expression"])
+            unique_variants.append(v)
+    return unique_variants
+
+def suggest_for_word(target_word: str, dict_file: str = "words.txt", letters_file: str = "letters.txt", max_parts=3, max_removals=2):
+    print(f"\n🧩 Ищем способы собрать слово '{target_word}' из словаря...\n")
+    dictionary = load_dictionary(dict_file)
+    variants = split_into_parts(target_word, dictionary, excluded_words=None, max_removals=max_removals, max_parts=max_parts)
+    if not variants:
+        print(f"❌ Не найдено способов собрать '{target_word}'")
+        return []
+    return variants
