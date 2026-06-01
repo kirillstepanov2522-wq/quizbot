@@ -741,6 +741,44 @@ async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"🔹 Первые 5: `{', '.join(list(word_list)[:5])}`\n"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def test_rebus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from rebus import load_dictionary, split_into_parts
+    import random
+    
+    msg = ""
+    
+    # 1. Проверяем загрузку словаря
+    dictionary = load_dictionary("words.txt")
+    msg += f"Загружено слов: {len(dictionary)}\n"
+    
+    if not dictionary:
+        msg += "❌ Словарь пуст!\n"
+        await update.message.reply_text(msg)
+        return
+    
+    # 2. Берём случайное короткое слово
+    short_words = [w for w in dictionary if len(w) <= 6]
+    msg += f"Коротких слов: {len(short_words)}\n"
+    
+    if not short_words:
+        msg += "❌ Нет коротких слов!\n"
+        await update.message.reply_text(msg)
+        return
+    
+    target_word = random.choice(short_words)
+    msg += f"Выбрано слово: {target_word}\n"
+    
+    # 3. Пробуем разбить
+    try:
+        variants = split_into_parts(target_word, dictionary, max_parts=2)
+        msg += f"Вариантов разбиения: {len(variants)}\n"
+        if variants:
+            msg += f"Первый вариант: {variants[0]['expression']}\n"
+    except Exception as e:
+        msg += f"❌ Ошибка: {e}\n"
+    
+    await update.message.reply_text(msg)
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -763,6 +801,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("rebus", rebus))
     app.add_handler(CommandHandler("checkdict", check_dict))
+    app.add_handler(CommandHandler("testrb", test_rebus_logic))
    
 
 
