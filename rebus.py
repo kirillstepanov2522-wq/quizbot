@@ -247,7 +247,14 @@ def draw_rebus_from_blocks(blocks_data, output_path="rebus_output.png", images_d
     
     x_offset = 0
     for img in images:
-        combined.paste(img, (x_offset, 0), img)
+       # Приводим img к RGB если она RGBA
+if img.mode == 'RGBA':
+    rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+    rgb_img.paste(img, mask=img.split()[3])  # используем альфа-канал как маску
+    combined.paste(rgb_img, (x_offset, 0))
+else:
+    combined.paste(img, (x_offset, 0))
+    
         x_offset += img.width + 30
     
     if output_path:
