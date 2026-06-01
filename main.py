@@ -713,6 +713,33 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Попробуй позже или добавь больше слов в словарь.",
         parse_mode="Markdown"
     )
+
+async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from rebus import load_dictionary
+    import os
+    
+    msg = "📁 *Диагностика словарей*\n\n"
+    
+    # Проверяем наличие файлов
+    if os.path.exists("words.txt"):
+        msg += "✅ `words.txt` существует\n"
+    else:
+        msg += "❌ `words.txt` НЕ найден\n"
+    
+    if os.path.exists("letters.txt"):
+        msg += "✅ `letters.txt` существует\n"
+    else:
+        msg += "❌ `letters.txt` НЕ найден\n"
+    
+    # Пробуем загрузить словарь
+    dictionary = load_dictionary("words.txt")
+    msg += f"\n📚 Загружено слов: {len(dictionary)}\n"
+    
+    if dictionary:
+        word_list = list(dictionary)
+        msg += f"🔹 Первые 5: `{', '.join(list(word_list)[:5])}`\n"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -734,6 +761,7 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(fastqz_completed, pattern="fastqz_completed"))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("rebus", rebus))
+    app.add_handler(CommandHandler("checkdict", check_dict))
    
 
 
