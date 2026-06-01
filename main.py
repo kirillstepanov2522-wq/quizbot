@@ -1,4 +1,5 @@
-from rebus import expression_to_blocks, draw_rebus_from_blocks
+from rebus import expression_to_blocks, draw_rebus_from_blocks, load_dictionary, split_into_parts
+import random
 from io import BytesIO
 import json
 import random
@@ -636,94 +637,82 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Файл базы данных не найден")
 
-@antispam_decorator
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Список готовых ребусов (ответ = выражение)
-    rebus_list = [
-        {"expr": "кар^1+вниз^1[з=р]", "answer": "арнир", "length": 6},
-        {"expr": "лиса~", "answer": "асил", "length": 4},
-        {"expr": "том[т=д]~", "answer": "мод", "length": 3},
-        {"expr": "рэй^1$1+воланд^1$2", "answer": "эол", "length": 3},
-        # Добавь свои ребусы сюда
-    ]
+    user_id = update.effective_user.id
     
-    r = random.choice(rebus_list)
-    expression = r["expr"]
-    answer = r["answer"]
-    word_length = r["length"]
-    
-    # Парсим выражение в блоки
-    blocks_data = expression_to_blocks(expression)
-    
-    if not blocks_data:
-        await update.message.reply_text("❌ Ошибка генерации ребуса")
+    # Загружаем словарь
+    dictionary = load_dictionary("words.txt")
+    if not dictionary:
+        await update.message.reply_text("❌ База слов пуста. Добавь слова в words.txt")
         return
     
-    # Генерируем картинку в памяти
-    img = draw_rebus_from_blocks(
-        blocks_data,
-        images_dir="images",
-        font_path="fonts/minecraft.ttf",  # путь к шрифту
-        frame_text="ТРЯСЛО993",
-        frame_padding=30,
-        letter_spacing_h=5,
-        letter_spacing_v=7
-    )
-    
-    if not img:
-        await update.message.reply_text("❌ Ошибка создания картинки. Возможно, нет картинок в папке images/")
+    # Берём случайное слово из словаря
+    word_list = list(dictionary)
+    if not word_list:
+        await update.message.reply_text("❌ Нет слов в словаре")
         return
     
-    # Сохраняем в BytesIO
-    bio = BytesIO()
-    img.save(bio, format="PNG")
-    bio.seek(0)
+    # Пытаемся подобрать ребус для случайного слова
+    for _ in range(10):  # максимум 10 попыток
+        target_word = random.choice(word_list)
+        
+        # Ищем способ собрать это слово из других слов словаря
+        variants = split_into_parts(target_word, dictionary, excluded_words=None, max_removals=2, max_parts=3)
+        
+        if variants:
+            # Берём первый подходящий вариант
+            variant = variants[0]
+            expression = variant["expression"]
+            
+            # Проверяем, есть ли картинки для всех слов в выражении
+            blocks_data = expression_to_blocks(expression)
+            all_images_exist = True
+            for block in blocks_data:
+                img_path = os.path.join("images", f"{block['word']}.webrp")
+                if not os.path.exists(img_path):
+                    for ext in ['.png', '.jpg', '.jpeg', '.webp']:
+                        alt_path = os.path.join("images", f"{block['word']}{ext}")
+                        if os.path.exists(alt_path):
+                            break
+                    else:
+                        all_images_exist = False
+                        break
+            
+            if all_images_exist:
+                # Генерируем картинку
+                try:
+                    img = draw_rebus_from_blocks(
+                        blocks_data,
+                        images_dir="images",
+                        font_path="fonts/minecraft.ttf",
+                        frame_text="ТРЯСЛО993",
+                        frame_padding=30,
+                        letter_spacing_h=5,
+                        letter_spacing_v=7
+                    )
+                    
+                    if img:
+                        bio = BytesIO()
+                        img.save(bio, format="PNG")
+                        bio.seek(0)
+                        
+                        await update.message.reply_photo(
+                            photo=bio,
+                            caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
+                            parse_mode="Markdown"
+                        )
+                        return
+                except Exception as e:
+                    print(f"Ошибка генерации: {e}")
+                    continue
     
-    # Отправляем фото с подсказкой
-    caption = f"🧩 *Отгадай слово ({word_length} букв)*\n\nПодсказка: ответ начинается с буквы «{answer[0]}»"
-    
-    await update.message.reply_photo(
-        photo=bio,
-        caption=caption,
+    # Если не нашли подходящего слова
+    await update.message.reply_text(
+        "❌ *Не удалось собрать ребус*\n\n"
+        "Из имеющихся в базе слов не получилось составить ребус.\n"
+        "Попробуй позже или добавь больше слов в словарь.",
         parse_mode="Markdown"
     )
-
-async def check_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    import os
-    msg = "📁 *Диагностика папок*\n\n"
-    
-    # Где мы сейчас
-    msg += f"📍 Текущая папка: `{os.getcwd()}`\n\n"
-    
-    # Что в текущей папке
-    try:
-        files = os.listdir(".")
-        msg += f"📄 В корне: {len(files)} элементов\n"
-        msg += f"🔹 `{', '.join(files[:10])}`\n\n"
-    except Exception as e:
-        msg += f"❌ Ошибка: {e}\n"
-    
-    # Проверяем папку images
-    if os.path.exists("images"):
-        msg += "✅ *Папка `images` существует*\n"
-        try:
-            imgs = os.listdir("images")
-            msg += f"📸 Картинок в images: {len(imgs)}\n"
-            if imgs:
-                msg += f"🔹 Первые 5: `{', '.join(imgs[:5])}`\n"
-        except Exception as e:
-            msg += f"❌ Ошибка чтения: {e}\n"
-    else:
-        msg += "❌ *Папка `images` НЕ найдена!*\n"
-        msg += "Проверь, что на GitHub файлы лежат ВНУТРИ папки images, а не в корне.\n"
-    
-    # Проверяем fonts
-    if os.path.exists("fonts"):
-        msg += "\n✅ *Папка `fonts` существует*"
-    else:
-        msg += "\n❌ *Папка `fonts` НЕ найдена*"
-    
-    await update.message.reply_text(msg, parse_mode="Markdown")
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
