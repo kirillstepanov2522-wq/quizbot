@@ -734,7 +734,7 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(fastqz_completed, pattern="fastqz_completed"))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("rebus", rebus))
-    app.add_handler(CommandHandler("check", check_images))
+   
 
 
     
