@@ -688,7 +688,43 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-
+async def check_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import os
+    msg = "📁 *Диагностика папок*\n\n"
+    
+    # Где мы сейчас
+    msg += f"📍 Текущая папка: `{os.getcwd()}`\n\n"
+    
+    # Что в текущей папке
+    try:
+        files = os.listdir(".")
+        msg += f"📄 В корне: {len(files)} элементов\n"
+        msg += f"🔹 `{', '.join(files[:10])}`\n\n"
+    except Exception as e:
+        msg += f"❌ Ошибка: {e}\n"
+    
+    # Проверяем папку images
+    if os.path.exists("images"):
+        msg += "✅ *Папка `images` существует*\n"
+        try:
+            imgs = os.listdir("images")
+            msg += f"📸 Картинок в images: {len(imgs)}\n"
+            if imgs:
+                msg += f"🔹 Первые 5: `{', '.join(imgs[:5])}`\n"
+        except Exception as e:
+            msg += f"❌ Ошибка чтения: {e}\n"
+    else:
+        msg += "❌ *Папка `images` НЕ найдена!*\n"
+        msg += "Проверь, что на GitHub файлы лежат ВНУТРИ папки images, а не в корне.\n"
+    
+    # Проверяем fonts
+    if os.path.exists("fonts"):
+        msg += "\n✅ *Папка `fonts` существует*"
+    else:
+        msg += "\n❌ *Папка `fonts` НЕ найдена*"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+    
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -709,6 +745,9 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(fastqz_completed, pattern="fastqz_completed"))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("rebus", rebus))
+    app.add_handler(CommandHandler("check", check_images))
+
+
     
     print("✅ Бот запущен!")
     app.run_polling()
