@@ -1,4 +1,4 @@
-from rebus_builder import expression_to_blocks, draw_rebus_from_blocks
+from rebus import expression_to_blocks, draw_rebus_from_blocks
 from io import BytesIO
 import json
 import random
