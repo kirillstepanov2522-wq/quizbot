@@ -745,38 +745,39 @@ async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def test_rebus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary, split_into_parts
     import random
+    import os
     
     msg = ""
     
-    # 1. Проверяем загрузку словаря
+    # 1. Проверяем words.txt
     dictionary = load_dictionary("words.txt")
-    msg += f"Загружено слов: {len(dictionary)}\n"
+    msg += f"📚 Загружено слов из words.txt: {len(dictionary)}\n"
     
-    if not dictionary:
-        msg += "❌ Словарь пуст!\n"
-        await update.message.reply_text(msg)
-        return
+    # 2. Проверяем letters.txt
+    if os.path.exists("letters.txt"):
+        with open("letters.txt", "r", encoding="utf-8") as f:
+            letters = [line.strip() for line in f if line.strip()]
+        msg += f"🔤 Загружено букв из letters.txt: {len(letters)}\n"
+        msg += f"🔹 Первые 10 букв: {', '.join(letters[:10])}\n"
+    else:
+        msg += "❌ Файл letters.txt НЕ НАЙДЕН\n"
     
-    # 2. Берём случайное короткое слово
-    short_words = [w for w in dictionary if len(w) <= 6]
-    msg += f"Коротких слов: {len(short_words)}\n"
-    
-    if not short_words:
-        msg += "❌ Нет коротких слов!\n"
-        await update.message.reply_text(msg)
-        return
-    
-    target_word = random.choice(short_words)
-    msg += f"Выбрано слово: {target_word}\n"
-    
-    # 3. Пробуем разбить
-    try:
-        variants = split_into_parts(target_word, dictionary, max_parts=2)
-        msg += f"Вариантов разбиения: {len(variants)}\n"
-        if variants:
-            msg += f"Первый вариант: {variants[0]['expression']}\n"
-    except Exception as e:
-        msg += f"❌ Ошибка: {e}\n"
+    # 3. Проверяем короткие слова
+    if dictionary:
+        short_words = [w for w in dictionary if len(w) <= 6]
+        msg += f"📏 Коротких слов (до 6 букв): {len(short_words)}\n"
+        
+        if short_words:
+            target_word = random.choice(short_words)
+            msg += f"🎯 Выбрано слово: {target_word}\n"
+            
+            try:
+                variants = split_into_parts(target_word, dictionary, max_parts=2)
+                msg += f"🧩 Вариантов разбиения: {len(variants)}\n"
+                if variants:
+                    msg += f"✅ Пример: {variants[0]['expression']}\n"
+            except Exception as e:
+                msg += f"❌ Ошибка разбиения: {e}\n"
     
     await update.message.reply_text(msg)
     
