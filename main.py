@@ -638,81 +638,82 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Файл базы данных не найден")
 
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks
+    from io import BytesIO
+    import random
+    import os
     
-    # Загружаем словарь
     dictionary = load_dictionary("words.txt")
     if not dictionary:
         await update.message.reply_text("❌ База слов пуста. Добавь слова в words.txt")
         return
     
-    # Берём случайное слово из словаря
-    word_list = list(dictionary)
-    if not word_list:
-        await update.message.reply_text("❌ Нет слов в словаре")
-        return
+    # Берём только короткие слова (до 6 букв)
+    short_words = [w for w in dictionary if len(w) <= 6]
+    if not short_words:
+        short_words = list(dictionary)
     
-    # Пытаемся подобрать ребус для случайного слова
-    for _ in range(10):  # максимум 10 попыток
-        target_word = random.choice(word_list)
+    for _ in range(20):  # пробуем 20 разных слов
+        target_word = random.choice(short_words)
         
-        # Ищем способ собрать это слово из других слов словаря
-        variants = split_into_parts(target_word, dictionary, excluded_words=None, max_removals=2, max_parts=3)
+        # Пытаемся разбить на 2 части
+        variants = split_into_parts(target_word, dictionary, max_parts=2)
+        if not variants:
+            continue  # это слово не разбивается — пробуем другое
         
-        if variants:
-            # Берём первый подходящий вариант
-            variant = variants[0]
-            expression = variant["expression"]
+        variant = variants[0]
+        expression = variant["expression"]
+        
+        # Проверяем, есть ли картинки для всех слов в выражении
+        blocks_data = expression_to_blocks(expression)
+        all_images_exist = True
+        for block in blocks_data:
+            found = False
+            for ext in ['.webrp', '.png', '.jpg', '.webp']:
+                if os.path.exists(os.path.join("images", f"{block['word']}{ext}")):
+                    found = True
+                    break
+            if not found:
+                all_images_exist = False
+                break
+        
+        if not all_images_exist:
+            continue  # нет картинки — пробуем другое слово
+        
+        # Генерируем картинку
+        try:
+            img = draw_rebus_from_blocks(
+                blocks_data,
+                images_dir="images",
+                font_path="fonts/minecraft.ttf",
+                frame_text="ТРЯСЛО993",
+                frame_padding=30,
+                letter_spacing_h=5,
+                letter_spacing_v=7
+            )
             
-            # Проверяем, есть ли картинки для всех слов в выражении
-            blocks_data = expression_to_blocks(expression)
-            all_images_exist = True
-            for block in blocks_data:
-                img_path = os.path.join("images", f"{block['word']}.webrp")
-                if not os.path.exists(img_path):
-                    for ext in ['.png', '.jpg', '.jpeg', '.webp']:
-                        alt_path = os.path.join("images", f"{block['word']}{ext}")
-                        if os.path.exists(alt_path):
-                            break
-                    else:
-                        all_images_exist = False
-                        break
-            
-            if all_images_exist:
-                # Генерируем картинку
-                try:
-                    img = draw_rebus_from_blocks(
-                        blocks_data,
-                        images_dir="images",
-                        font_path="fonts/minecraft.ttf",
-                        frame_text="ТРЯСЛО993",
-                        frame_padding=30,
-                        letter_spacing_h=5,
-                        letter_spacing_v=7
-                    )
-                    
-                    if img:
-                        bio = BytesIO()
-                        img.save(bio, format="PNG")
-                        bio.seek(0)
-                        
-                        await update.message.reply_photo(
-                            photo=bio,
-                            caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
-                            parse_mode="Markdown"
-                        )
-                        return
-                except Exception as e:
-                    print(f"Ошибка генерации: {e}")
-                    continue
+            if img:
+                bio = BytesIO()
+                img.save(bio, format="PNG")
+                bio.seek(0)
+                await update.message.reply_photo(
+                    photo=bio,
+                    caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
+                    parse_mode="Markdown"
+                )
+                return
+        except Exception as e:
+            print(f"Ошибка генерации: {e}")
+            continue
     
-    # Если не нашли подходящего слова
+    # Если ничего не подошло
     await update.message.reply_text(
         "❌ *Не удалось собрать ребус*\n\n"
-        "Из имеющихся в базе слов не получилось составить ребус.\n"
-        "Попробуй позже или добавь больше слов в словарь.",
+        "Из имеющихся слов не получилось составить ребус.\n"
+        "Попробуй позже.",
         parse_mode="Markdown"
     )
+
 
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
