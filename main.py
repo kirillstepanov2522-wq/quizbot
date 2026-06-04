@@ -1,4 +1,5 @@
 from rebus import expression_to_blocks, draw_rebus_from_blocks, load_dictionary, split_into_parts
+from telegram.ext import MessageHandler, filters
 import random
 from io import BytesIO
 import json
@@ -637,6 +638,7 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     else:
         await update.message.reply_text("❌ Файл базы данных не найден")
+        
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
     from io import BytesIO
@@ -695,6 +697,11 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
                     parse_mode="Markdown"
                 )
+                sent_message = await update.message.reply_photo(...)  # сохраняем в переменную
+active_rebuses[update.effective_user.id] = {
+    "word": target_word,
+    "message_id": sent_message.message_id
+}
                 return
         except Exception as e:
             print(f"Ошибка при {target_word}: {e}")
@@ -976,6 +983,36 @@ async def list_all_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "❌ Папка images не найдена"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
+# Хранилище активных ребусов для каждого пользователя
+active_rebuses = {}  # {user_id: {"word": "арнир", "message_id": 123}}
+
+# В команду /rebus добавь после отправки картинки:
+# active_rebuses[update.effective_user.id] = {"word": target_word, "message_id": sent_message.message_id}
+
+# Обработчик текстовых сообщений (проверка ответов)
+async def check_rebus_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    answer = update.message.text.strip().lower()
+    
+    active = active_rebuses.get(user_id)
+    if not active:
+        return  # нет активного ребуса — игнорируем
+    
+    if answer == active["word"].lower():
+        # Правильно!
+        user_name = update.effective_user.first_name
+        add_rebus_solve(user_id, user_name)
+        
+        await update.message.reply_text(
+            f"✅ *{user_name}*, правильно! +1 очко!\n🎉 Загаданное слово: *{active['word']}*",
+            parse_mode="Markdown"
+        )
+        del active_rebuses[user_id]  # ребус отгадан, удаляем
+    else:
+        await update.message.reply_text(
+            f"❌ Неправильно. Попробуй ещё раз или напиши /rebus для нового ребуса.",
+            parse_mode="Markdown"
+        )
 
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -1006,6 +1043,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("testcomplex", test_complex))
     app.add_handler(CommandHandler("checkbytes", check_bytes))
     app.add_handler(CommandHandler("allimg", list_all_images))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_rebus_answer))
+
 
     
     
