@@ -655,6 +655,37 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     else:
         await update.message.reply_text("❌ Файл базы данных не найден")
+
+@antispam_decorator
+async def rebus_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔ Нет прав")
+        return
+    
+    conn = sqlite3.connect('quiz_users.db')
+    c = conn.cursor()
+    c.execute("SELECT user_id, user_name, solves FROM rebus_solves ORDER BY solves DESC")
+    data = c.fetchall()
+    conn.close()
+    
+    if not data:
+        await update.message.reply_text("❌ Нет данных о ребусах")
+        return
+    
+    # Сохраняем в JSON
+    backup_data = [{"user_id": row[0], "user_name": row[1], "solves": row[2]} for row in data]
+    
+    with open("rebus_backup.json", "w", encoding="utf-8") as f:
+        json.dump(backup_data, f, ensure_ascii=False, indent=2)
+    
+    with open("rebus_backup.json", "rb") as f:
+        await update.message.reply_document(
+            document=f,
+            filename="rebus_backup.json",
+            caption="📦 Резервная копия топа ребусов"
+        )
+    
+    os.remove("rebus_backup.json")
         
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
@@ -732,6 +763,51 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Попробуй позже.",
         parse_mode="Markdown"
     )
+
+@antispam_decorator
+async def editrebusstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔ Нет прав")
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "📝 *Использование:* `/editrebusstats <user_id> количество`\n"
+            "Пример: `/editrebusstats 123456789 15`\n\n"
+            "⚠️ Используй числовой ID пользователя.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        new_solves = int(context.args[1])
+    except:
+        await update.message.reply_text("❌ Оба аргумента должны быть числами")
+        return
+    
+    conn = sqlite3.connect('quiz_users.db')
+    c = conn.cursor()
+    
+    # Получаем имя пользователя
+    c.execute("SELECT user_name FROM rebus_solves WHERE user_id = ?", (target_user_id,))
+    result = c.fetchone()
+    
+    if result:
+        user_name = result[0]
+        c.execute("UPDATE rebus_solves SET solves = ? WHERE user_id = ?", (new_solves, target_user_id))
+        await update.message.reply_text(f"🔄 Обновлён пользователь {user_name} (ID: {target_user_id}) → {new_solves} ребусов")
+    else:
+        # Спрашиваем имя пользователя
+        await update.message.reply_text(
+            f"❌ Пользователь с ID {target_user_id} не найден в топе ребусов.\n"
+            f"Сначала он должен отгадать хотя бы один ребус через /rebus"
+        )
+        conn.close()
+        return
+    
+    conn.commit()
+    conn.close()
     
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
@@ -1085,6 +1161,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("allimg", list_all_images))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_rebus_answer))
     app.add_handler(CommandHandler("rebustop", rebus_top))
+    app.add_handler(CommandHandler("rebusbackup", rebus_backup))
+    app.add_handler(CommandHandler("restorerebusstats", restore_rebus_stats))
+    app.add_handler(CommandHandler("editrebusstats", editrebusstats))
 
 
     
