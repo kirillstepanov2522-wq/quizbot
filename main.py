@@ -653,10 +653,9 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not candidates:
         candidates = list(dictionary)
     
-    for _ in range(20):  # пробуем 20 разных слов
+    for _ in range(30):
         target_word = random.choice(candidates)
         
-        # Пытаемся разбить на 2 части
         variants = split_into_parts(target_word, dictionary, max_parts=2)
         if not variants:
             continue
@@ -664,12 +663,11 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         variant = variants[0]
         expression = variant["expression"]
         
-        # ПРОВЕРКА КАРТИНОК (упрощённая)
+        # Проверяем наличие картинок
         blocks_data = expression_to_blocks(expression)
         all_good = True
         for block in blocks_data:
             word = block["word"]
-            # Проверяем наличие картинки (любое расширение)
             found = False
             for ext in ['.webrp', '.png', '.jpg', '.webp']:
                 if os.path.exists(os.path.join("images", f"{word}{ext}")):
@@ -682,7 +680,6 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not all_good:
             continue
         
-        # Генерируем картинку
         try:
             img = draw_rebus_from_blocks(
                 blocks_data,
@@ -705,13 +702,12 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
         except Exception as e:
-            print(f"Ошибка генерации: {e}")
+            print(f"Ошибка: {e}")
             continue
     
-    # Если ничего не подошло
     await update.message.reply_text(
         "❌ *Не удалось собрать ребус*\n\n"
-        "Попробуй позже или напиши /testrb чтобы проверить словарь.",
+        "Попробуй позже.",
         parse_mode="Markdown"
     )
 
