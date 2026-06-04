@@ -3,6 +3,7 @@ import sys
 import os
 from itertools import product
 from PIL import Image, ImageDraw, ImageFont
+from rebus import find_image_case_insensitive
 
 # ========== ФУНКЦИЯ ДЛЯ ТЕКСТА С ОБВОДКОЙ ==========
 def draw_text_with_outline(draw, text, position, font, text_color="black", outline_color="gray", outline_width=1):
