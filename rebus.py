@@ -3,7 +3,6 @@ import sys
 import os
 from itertools import product
 from PIL import Image, ImageDraw, ImageFont
-from rebus import find_image_case_insensitive
 
 # ========== ФУНКЦИЯ ДЛЯ ТЕКСТА С ОБВОДКОЙ ==========
 def draw_text_with_outline(draw, text, position, font, text_color="black", outline_color="gray", outline_width=1):
@@ -64,6 +63,7 @@ def find_image_case_insensitive(word, images_dir="images"):
     return None
 
 # ========== ГЕНЕРАЦИЯ КАРТИНКИ РЕБУСА ==========
+from rebus import find_image_case_insensitive
 def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", font_path=None, target_size=(150, 150), frame_text="ТРЯСЛО993", frame_padding=30, letter_spacing_h=5, letter_spacing_v=7):
     
     if not font_path:
