@@ -229,6 +229,112 @@ def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", f
     
     if output_path:
         combined.save(output_path)
+    
+    return combined  # <--- ЭТО ГЛАВНОЕ
+        
+        def draw_text_with_spacing_h(draw, text, x, y, font, spacing, text_color="black", outline_color="gray", outline_width=1):
+            current_x = x
+            for char in text:
+                for dx in range(-outline_width, outline_width + 1):
+                    for dy in range(-outline_width, outline_width + 1):
+                        if dx != 0 or dy != 0:
+                            draw.text((current_x + dx, y + dy), char, fill=outline_color, font=font)
+                draw.text((current_x, y), char, fill=text_color, font=font)
+                bbox = draw.textbbox((0, 0), char, font=font)
+                char_width = bbox[2] - bbox[0]
+                current_x += char_width + spacing
+        
+        def draw_text_with_spacing_v(draw, text, x, y, font, spacing, text_color="black", outline_color="gray", outline_width=1):
+            current_y = y
+            for char in text:
+                for dx in range(-outline_width, outline_width + 1):
+                    for dy in range(-outline_width, outline_width + 1):
+                        if dx != 0 or dy != 0:
+                            draw.text((x + dx, current_y + dy), char, fill=outline_color, font=font)
+                draw.text((x, current_y), char, fill=text_color, font=font)
+                bbox = draw.textbbox((0, 0), char, font=font)
+                char_height = bbox[3] - bbox[1]
+                current_y += char_height + spacing
+        
+        def sum_char_widths_with_spacing(draw, text, font, spacing):
+            total = 0
+            for i, char in enumerate(text):
+                bbox = draw.textbbox((0, 0), char, font=font)
+                char_width = bbox[2] - bbox[0]
+                total += char_width
+                if i < len(text) - 1:
+                    total += spacing
+            return total
+        
+        y_top = 5
+        x_start = (img.width - sum_char_widths_with_spacing(draw, text, frame_font, letter_spacing_h)) // 2
+        draw_text_with_spacing_h(draw, text, x_start, y_top, frame_font, letter_spacing_h,
+                                  text_color="black", outline_color="gray", outline_width=1)
+        
+        bbox = draw.textbbox((0, 0), "A", font=frame_font)
+        line_height = bbox[3] - bbox[1]
+        y_bottom = img.height - line_height - 5
+        x_start_bottom = (img.width - sum_char_widths_with_spacing(draw, text, frame_font, letter_spacing_h)) // 2
+        draw_text_with_spacing_h(draw, text, x_start_bottom, y_bottom, frame_font, letter_spacing_h,
+                                  text_color="black", outline_color="gray", outline_width=1)
+        
+        x_left = 8
+        y_start = frame_padding + 10
+        draw_text_with_spacing_v(draw, text, x_left, y_start, frame_font, letter_spacing_v,
+                                  text_color="black", outline_color="gray", outline_width=1)
+        
+        max_char_width = 0
+        for char in text:
+            bbox = draw.textbbox((0, 0), char, font=frame_font)
+            char_width = bbox[2] - bbox[0]
+            if char_width > max_char_width:
+                max_char_width = char_width
+        x_right = img.width - max_char_width - 8
+        draw_text_with_spacing_v(draw, text, x_right, y_start, frame_font, letter_spacing_v,
+                                  text_color="black", outline_color="gray", outline_width=1)
+        
+        if block['removals_left'] > 0:
+            draw_text_with_outline(draw, "," * block['removals_left'], (frame_padding + 10, frame_padding + 10), font_big, 
+                                   text_color="black", outline_color="gray", outline_width=1)
+        
+        if block['removals_right'] > 0:
+            comma_text = "," * block['removals_right']
+            bbox = draw.textbbox((0, 0), comma_text, font=font_big)
+            comma_width = bbox[2] - bbox[0]
+            draw_text_with_outline(draw, comma_text, (img.width - comma_width - frame_padding - 10, img.height - frame_padding - 30), font_big,
+                                   text_color="black", outline_color="gray", outline_width=1)
+        
+        if block['replacements']:
+            repl_text = ", ".join([f"{k}={v}" for k, v in block['replacements'].items()])
+            bbox = draw.textbbox((0, 0), repl_text, font=font_small)
+            repl_width = bbox[2] - bbox[0]
+            draw_text_with_outline(draw, repl_text, ((img.width - repl_width) // 2, img.height - frame_padding - 15), font_small,
+                                   text_color="black", outline_color="gray", outline_width=1)
+        
+        if block['reverse']:
+            img = img.transpose(Image.Transpose.ROTATE_180)
+        
+        images.append(img)
+    
+    if not images:
+        return None
+    
+    total_width = sum(img.width for img in images) + 30 * (len(images) - 1)
+    max_height = max(img.height for img in images)
+    combined = Image.new("RGB", (total_width, max_height), "white")
+    
+    x_offset = 0
+    for img in images:
+        if img.mode == 'RGBA':
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[3])
+            combined.paste(rgb_img, (x_offset, 0))
+        else:
+            combined.paste(img, (x_offset, 0))
+        x_offset += img.width + 30
+    
+    if output_path:
+        combined.save(output_path)
     return combined
 
 # ========== РАБОТА С БАЗОЙ СЛОВ ==========
