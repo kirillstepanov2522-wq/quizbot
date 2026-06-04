@@ -951,6 +951,19 @@ async def test_complex(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bio.seek(0)
     await update.message.reply_photo(bio, caption="Сложный ребус")
 
+async def check_bytes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import os
+    word = "шрам"
+    for ext in ['.webrp', '.webp']:
+        path = os.path.join("images", f"{word}{ext}")
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                header = f.read(12)
+            await update.message.reply_text(f"{path}: {header.hex()}")
+            return
+    await update.message.reply_text("Файл не найден")
+
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -978,6 +991,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("debugrebus", debug_rebus))
     app.add_handler(CommandHandler("testgen", test_gen))
     app.add_handler(CommandHandler("testcomplex", test_complex))
+    app.add_handler(CommandHandler("checkbytes", check_bytes))
 
     
     
