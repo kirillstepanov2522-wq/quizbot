@@ -963,6 +963,19 @@ async def check_bytes(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     await update.message.reply_text("Файл не найден")
 
+async def list_all_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import os
+    msg = "📁 *Все файлы в images:*\n"
+    if os.path.exists("images"):
+        files = os.listdir("images")
+        for f in sorted(files)[:30]:
+            msg += f"• `{f}`\n"
+        if len(files) > 30:
+            msg += f"\n... и ещё {len(files) - 30} файлов"
+    else:
+        msg += "❌ Папка images не найдена"
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -992,6 +1005,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("testgen", test_gen))
     app.add_handler(CommandHandler("testcomplex", test_complex))
     app.add_handler(CommandHandler("checkbytes", check_bytes))
+    app.add_handler(CommandHandler("allimg", list_all_images))
 
     
     
