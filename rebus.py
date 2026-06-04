@@ -80,14 +80,8 @@ def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", f
     
     images = []
     for block in blocks_data:
-        img_path = os.path.join(images_dir, f"{block['word']}.png")
-        if not os.path.exists(img_path):
-            for ext in ['.jpg', '.jpeg', '.webp', '.webrp']:
-                alt_path = os.path.join(images_dir, f"{block['word']}{ext}")
-                if os.path.exists(alt_path):
-                    img_path = alt_path
-                    break
-            else:
+    img_path = find_image_case_insensitive(block['word'], images_dir)
+if img_path is None:  
                 img = Image.new("RGB", target_size, "lightgray")
                 draw = ImageDraw.Draw(img)
                 if font_path:
