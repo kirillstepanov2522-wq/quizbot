@@ -13,6 +13,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 # ===== НАСТРОЙКИ =====
 TOKEN = "8798378718:AAGRxt_IwUR0m8a2M97l-5TPn8PhWpcNL9s"
+CACHE_CHAT_ID = -1002546333211  # ← твой ID из шага 2
 ADMIN_ID = 5206039766
 QUIZ_FILE = "quizzes.json"
 
@@ -684,14 +685,26 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bio = BytesIO()
                 img.save(bio, format='PNG')
                 bio.seek(0)
+                bio.name = 'rebus.png'  # даём имя файлу
                 
-                # ОТПРАВЛЯЕМ ТОЛЬКО ФОТО, БЕЗ ЛИШНИХ СООБЩЕНИЙ
-                await update.message.reply_photo(
+                # Отправляем в кэш-канал
+                cached = await context.bot.send_photo(
+                    chat_id=CACHE_CHAT_ID,
                     photo=bio,
+                    caption=f"Ребус для {update.effective_user.first_name}"
+                )
+                
+                # Получаем file_id из отправленного фото
+                file_id = cached.photo[-1].file_id
+                
+                # Отправляем пользователю по file_id
+                await update.message.reply_photo(
+                    photo=file_id,
                     caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
                     parse_mode="Markdown"
                 )
                 return
+                
         except Exception as e:
             print(f"Ошибка: {e}")
             continue
