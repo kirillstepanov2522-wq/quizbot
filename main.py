@@ -641,40 +641,45 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
     from io import BytesIO
     import random
+    import os
+    import traceback
     
-    dictionary = load_dictionary("words.txt")
-    if not dictionary:
-        await update.message.reply_text("❌ База слов пуста")
-        return
-    
-    # Берём слова длиной 3-6 букв
-    candidates = [w for w in dictionary if 3 <= len(w) <= 6]
-    if not candidates:
-        candidates = list(dictionary)
-    
-    for _ in range(30):
-        target_word = random.choice(candidates)
+    try:
+        dictionary = load_dictionary("words.txt")
+        if not dictionary:
+            await update.message.reply_text("❌ База слов пуста")
+            return
         
-        variants = split_into_parts(target_word, dictionary, max_parts=2)
-        if not variants:
-            continue
+        candidates = [w for w in dictionary if 3 <= len(w) <= 6]
+        if not candidates:
+            candidates = list(dictionary)
         
-        variant = variants[0]
-        expression = variant["expression"]
-        
-        # Проверяем наличие картинок (без учёта регистра)
-        blocks_data = expression_to_blocks(expression)
-        all_good = True
-        for block in blocks_data:
-            word = block["word"]
-            if find_image_case_insensitive(word) is None:
-                all_good = False
-                break
-        
-        if not all_good:
-            continue
-        
-        try:
+        for _ in range(30):
+            target_word = random.choice(candidates)
+            
+            variants = split_into_parts(target_word, dictionary, max_parts=2)
+            if not variants:
+                continue
+            
+            variant = variants[0]
+            expression = variant["expression"]
+            
+            # Проверяем наличие картинок
+            blocks_data = expression_to_blocks(expression)
+            all_good = True
+            missing_images = []
+            for block in blocks_data:
+                word = block["word"]
+                img_path = find_image_case_insensitive(word)
+                if img_path is None:
+                    all_good = False
+                    missing_images.append(word)
+            
+            if not all_good:
+                print(f"Пропущены картинки для: {missing_images}")
+                continue
+            
+            # Генерируем картинку
             img = draw_rebus_from_blocks(
                 blocks_data,
                 images_dir="images",
@@ -685,26 +690,31 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 letter_spacing_v=7
             )
             
-            if img:
-                bio = BytesIO()
-                img.save(bio, format="PNG")
-                bio.seek(0)
-                await update.message.reply_photo(
-                    photo=bio,
-                    caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
-                    parse_mode="Markdown"
-                )
-                return
-        except Exception as e:
-            print(f"Ошибка: {e}")
-            continue
+            if img is None:
+                print("draw_rebus_from_blocks вернула None")
+                continue
+            
+            # Проверяем, что img не пустой
+            if img.width == 0 or img.height == 0:
+                print("Картинка имеет нулевой размер")
+                continue
+            
+            bio = BytesIO()
+            img.save(bio, format="PNG")
+            bio.seek(0)
+            
+            await update.message.reply_photo(
+                photo=bio,
+                caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
+                parse_mode="Markdown"
+            )
+            return
+        
+        await update.message.reply_text("❌ Не удалось собрать ребус после 30 попыток")
     
-    await update.message.reply_text(
-        "❌ *Не удалось собрать ребус*\n\n"
-        "Попробуй позже.",
-        parse_mode="Markdown"
-    )
-
+    except Exception as e:
+        error_text = f"❌ Ошибка:\n{str(e)[:500]}\n\n{traceback.format_exc()[-500:]}"
+        await update.message.reply_text(error_text)
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
     import os
@@ -779,6 +789,19 @@ async def check_rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ rebus НЕ загружен: {e}")
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
+
+async def test_pillow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    
+    img = Image.new('RGB', (200, 100), color='white')
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 40), "Тест Pillow", fill='black')
+    
+    bio = BytesIO()
+    img.save(bio, format='PNG')
+    bio.seek(0)
+    await update.message.reply_photo(bio, caption="Pillow работает!")
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -803,7 +826,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("checkdict", check_dict))
     app.add_handler(CommandHandler("testrb", test_rebus_logic))
     app.add_handler(CommandHandler("checkrebus", check_rebus))
-   
+    app.add_handler(CommandHandler("testpillow", test_pillow))
 
 
     
