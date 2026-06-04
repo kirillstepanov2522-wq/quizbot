@@ -799,7 +799,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("rebus", rebus))
     app.add_handler(CommandHandler("checkdict", check_dict))
     app.add_handler(CommandHandler("testrb", test_rebus_logic))
-    app.add_handler(CallbackQueryHandler(rebus_callback, pattern="^rebus_"))
    
 
 
