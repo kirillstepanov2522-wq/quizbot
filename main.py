@@ -690,7 +690,7 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 img.save(bio, format='PNG')
                 bio.seek(0)
                 
-                await update.message.reply_photo(
+                await update.message.reply_document(
                     photo=bio,
                     caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
                     parse_mode="Markdown"
