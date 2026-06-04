@@ -802,6 +802,89 @@ async def test_pillow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     img.save(bio, format='PNG')
     bio.seek(0)
     await update.message.reply_photo(bio, caption="Pillow работает!")
+
+async def debug_rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
+    from io import BytesIO
+    import random
+    import os
+    import traceback
+    
+    msg = "🔍 *Диагностика ребуса*\n\n"
+    
+    # 1. Словарь
+    dictionary = load_dictionary("words.txt")
+    msg += f"📚 Слов в словаре: {len(dictionary)}\n"
+    
+    candidates = [w for w in dictionary if 3 <= len(w) <= 6]
+    msg += f"📏 Коротких слов: {len(candidates)}\n"
+    
+    if not candidates:
+        await update.message.reply_text(msg + "❌ Нет коротких слов")
+        return
+    
+    target_word = random.choice(candidates)
+    msg += f"🎯 Пробуем слово: {target_word}\n"
+    
+    # 2. Разбиение
+    variants = split_into_parts(target_word, dictionary, max_parts=2)
+    msg += f"🧩 Вариантов разбиения: {len(variants)}\n"
+    
+    if not variants:
+        await update.message.reply_text(msg + "❌ Нет вариантов разбиения")
+        return
+    
+    variant = variants[0]
+    expression = variant["expression"]
+    msg += f"📝 Выражение: {expression}\n"
+    
+    # 3. Проверка картинок
+    blocks_data = expression_to_blocks(expression)
+    msg += f"🧱 Блоков: {len(blocks_data)}\n"
+    
+    all_good = True
+    for block in blocks_data:
+        word = block["word"]
+        img_path = find_image_case_insensitive(word)
+        msg += f"  {'✅' if img_path else '❌'} {word} → {img_path if img_path else 'НЕ НАЙДЕН'}\n"
+        if not img_path:
+            all_good = False
+    
+    if not all_good:
+        await update.message.reply_text(msg + "❌ Не хватает картинок")
+        return
+    
+    # 4. Генерация
+    try:
+        img = draw_rebus_from_blocks(
+            blocks_data,
+            images_dir="images",
+            font_path="fonts/minecraft.ttf",
+            frame_text="ТРЯСЛО993",
+            frame_padding=30,
+            letter_spacing_h=5,
+            letter_spacing_v=7
+        )
+        
+        if img is None:
+            msg += "❌ draw_rebus_from_blocks вернула None\n"
+            await update.message.reply_text(msg)
+            return
+        
+        msg += "✅ Картинка сгенерирована, отправляю...\n"
+        await update.message.reply_text(msg)
+        
+        bio = BytesIO()
+        img.save(bio, format="PNG")
+        bio.seek(0)
+        await update.message.reply_photo(
+            photo=bio,
+            caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        msg += f"❌ Ошибка генерации: {str(e)[:200]}\n{traceback.format_exc()[:500]}"
+        await update.message.reply_text(msg)
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -827,6 +910,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("testrb", test_rebus_logic))
     app.add_handler(CommandHandler("checkrebus", check_rebus))
     app.add_handler(CommandHandler("testpillow", test_pillow))
+    app.add_handler(CommandHandler("debugrebus", debug_rebus))
 
 
     
