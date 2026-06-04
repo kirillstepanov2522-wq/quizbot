@@ -81,25 +81,29 @@ def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", f
     
     images = []
     for block in blocks_data:
-    img_path = find_image_case_insensitive(block['word'], images_dir)
-if img_path is None:  
-                img = Image.new("RGB", target_size, "lightgray")
-                draw = ImageDraw.Draw(img)
-                if font_path:
-                    try:
-                        font = ImageFont.truetype(font_path, 20)
-                    except:
-                        font = ImageFont.load_default()
-                else:
-                    font = ImageFont.load_default()
-                bbox = draw.textbbox((0, 0), block['word'], font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                draw.text(((target_size[0] - text_width) // 2, (target_size[1] - text_height) // 2), 
-                         block['word'], fill="black", font=font)
-                images.append(img)
-                continue
+        # ИСПОЛЬЗУЕМ find_image_case_insensitive для поиска картинки
+        img_path = find_image_case_insensitive(block['word'], images_dir)
         
+        if img_path is None:
+            # Создаём заглушку, если картинка не найдена
+            img = Image.new("RGB", target_size, "lightgray")
+            draw = ImageDraw.Draw(img)
+            if font_path:
+                try:
+                    font = ImageFont.truetype(font_path, 20)
+                except:
+                    font = ImageFont.load_default()
+            else:
+                font = ImageFont.load_default()
+            bbox = draw.textbbox((0, 0), block['word'], font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            draw.text(((target_size[0] - text_width) // 2, (target_size[1] - text_height) // 2), 
+                     block['word'], fill="black", font=font)
+            images.append(img)
+            continue
+        
+        # Картинка найдена — загружаем её
         img = Image.open(img_path).convert("RGBA")
         img.thumbnail(target_size, Image.LANCZOS)
         
