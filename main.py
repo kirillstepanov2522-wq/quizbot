@@ -919,6 +919,43 @@ async def test_gen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_photo(bio, caption="Тестовая картинка")
 
+async def test_complex(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from rebus import expression_to_blocks, draw_rebus_from_blocks
+    from io import BytesIO
+
+    # То самое выражение, которое диагностика показала
+    test_expr = "саша^1$2 + шрам$1"
+    
+    await update.message.reply_text(f"Пробуем: {test_expr}")
+    
+    blocks = expression_to_blocks(test_expr)
+    if not blocks:
+        await update.message.reply_text("❌ Не удалось разобрать выражение")
+        return
+    
+    # Проверяем, есть ли картинки
+    for block in blocks:
+        await update.message.reply_text(f"Блок: {block['word']}, удаление слева: {block['removals_left']}, справа: {block['removals_right']}")
+    
+    img = draw_rebus_from_blocks(
+        blocks,
+        images_dir="images",
+        font_path="fonts/minecraft.ttf",
+        frame_text="ТРЯСЛО993",
+        frame_padding=30,
+        letter_spacing_h=5,
+        letter_spacing_v=7
+    )
+    
+    if img is None:
+        await update.message.reply_text("❌ draw_rebus_from_blocks вернула None")
+        return
+    
+    bio = BytesIO()
+    img.save(bio, format='PNG')
+    bio.seek(0)
+    await update.message.reply_photo(bio, caption="Сложный ребус")
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -945,6 +982,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("testpillow", test_pillow))
     app.add_handler(CommandHandler("debugrebus", debug_rebus))
     app.add_handler(CommandHandler("testgen", test_gen))
+    app.add_handler(CommandHandler("testcomplex", test_complex))
+
+    
     
 
 
