@@ -645,27 +645,32 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     dictionary = load_dictionary("words.txt")
     if not dictionary:
-        await update.message.reply_text("❌ База слов пуста. Добавь слова в words.txt")
+        await update.message.reply_text("❌ База слов пуста")
         return
     
-    # Берём только короткие слова (до 6 букв)
-    short_words = [w for w in dictionary if len(w) <= 6]
-    if not short_words:
-        short_words = list(dictionary)
+    # Берём слова длиной 3-6 букв
+    candidates = [w for w in dictionary if 3 <= len(w) <= 6]
+    if not candidates:
+        candidates = list(dictionary)
     
-    for _ in range(20):  # пробуем 20 разных слов
-        target_word = random.choice(short_words)
-        
-        # Пытаемся разбить на 2 части
+    rebus_options = []
+    
+    # Собираем 3 варианта ребусов
+    for _ in range(10):  # максимум 10 попыток найти 3 варианта
+        if len(rebus_options) >= 3:
+            break
+            
+        target_word = random.choice(candidates)
         variants = split_into_parts(target_word, dictionary, max_parts=2)
+        
         if not variants:
-            continue  # это слово не разбивается — пробуем другое
+            continue
         
-        variant = variants[0]
-        expression = variant["expression"]
+        # Берём первый подходящий вариант
+        expr = variants[0]["expression"]
         
-        # Проверяем, есть ли картинки для всех слов в выражении
-        blocks_data = expression_to_blocks(expression)
+        # Проверяем, есть ли картинки
+        blocks_data = expression_to_blocks(expr)
         all_images_exist = True
         for block in blocks_data:
             found = False
@@ -678,42 +683,82 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
         
         if not all_images_exist:
-            continue  # нет картинки — пробуем другое слово
-        
-        # Генерируем картинку
-        try:
-            img = draw_rebus_from_blocks(
-                blocks_data,
-                images_dir="images",
-                font_path="fonts/minecraft.ttf",
-                frame_text="ТРЯСЛО993",
-                frame_padding=30,
-                letter_spacing_h=5,
-                letter_spacing_v=7
-            )
-            
-            if img:
-                bio = BytesIO()
-                img.save(bio, format="PNG")
-                bio.seek(0)
-                await update.message.reply_photo(
-                    photo=bio,
-                    caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
-                    parse_mode="Markdown"
-                )
-                return
-        except Exception as e:
-            print(f"Ошибка генерации: {e}")
             continue
+        
+        rebus_options.append({
+            "word": target_word,
+            "expr": expr,
+            "blocks": blocks_data,
+            "length": len(target_word)
+        })
     
-    # Если ничего не подошло
+    if not rebus_options:
+        await update.message.reply_text("❌ Не удалось собрать ребусы. Попробуй позже.")
+        return
+    
+    # Сохраняем варианты в context.user_data
+    context.user_data["rebus_options"] = rebus_options
+    
+    # Создаём кнопки
+    keyboard = []
+    for i, opt in enumerate(rebus_options, 1):
+        keyboard.append([InlineKeyboardButton(f"🧩 Ребус {i} ({opt['length']} букв)", callback_data=f"rebus_{i-1}")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
-        "❌ *Не удалось собрать ребус*\n\n"
-        "Из имеющихся слов не получилось составить ребус.\n"
-        "Попробуй позже.",
-        parse_mode="Markdown"
+        "🎯 *Выбери ребус:*\n\n"
+        "Каждый ребус загадывает слово. Отгадаешь?",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
 
+async def rebus_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    data = context.user_data.get("rebus_options")
+    
+    if not data:
+        await query.edit_message_text("❌ Ребусы устарели. Напиши /rebus заново.")
+        return
+    
+    # Получаем индекс выбранного ребуса
+    idx = int(query.data.split("_")[1])
+    opt = data[idx]
+    
+    # Генерируем картинку
+    try:
+        img = draw_rebus_from_blocks(
+            opt["blocks"],
+            images_dir="images",
+            font_path="fonts/minecraft.ttf",
+            frame_text="ТРЯСЛО993",
+            frame_padding=30,
+            letter_spacing_h=5,
+            letter_spacing_v=7
+        )
+        
+        if img:
+            bio = BytesIO()
+            img.save(bio, format="PNG")
+            bio.seek(0)
+            
+            await query.edit_message_caption(
+                caption=f"🧩 *Отгадай слово ({opt['length']} букв)*\n\nПодсказка: первая буква — «{opt['word'][0]}»",
+                parse_mode="Markdown"
+            )
+            await query.message.reply_photo(
+                photo=bio,
+                caption=f"🧩 *Отгадай слово ({opt['length']} букв)*\n\nПодсказка: первая буква — «{opt['word'][0]}»",
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text("❌ Ошибка генерации картинки")
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        await query.edit_message_text("❌ Ошибка при создании ребуса")
 
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
@@ -803,6 +848,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("rebus", rebus))
     app.add_handler(CommandHandler("checkdict", check_dict))
     app.add_handler(CommandHandler("testrb", test_rebus_logic))
+    app.add_handler(CallbackQueryHandler(rebus_callback, pattern="^rebus_"))
    
 
 
