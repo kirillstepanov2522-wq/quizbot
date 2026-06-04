@@ -347,9 +347,14 @@ def split_into_parts(word: str, dictionary: set, excluded_words: set = None, max
 
 def find_image_case_insensitive(word, images_dir="images"):
     if not os.path.exists(images_dir):
+        print(f"Папка {images_dir} не существует")
         return None
-    for ext in ['.webrp', '.png', '.jpg', '.jpeg', '.webp']:
+    word_lower = word.lower()
+    for ext in ['.webp', '.png', '.jpg', '.jpeg']:
         for f in os.listdir(images_dir):
-            if f.lower() == f"{word}{ext}".lower():
+            print(f"Сравниваем: f.lower() = {f.lower()}, ищем {word_lower}{ext}")
+            if f.lower() == f"{word_lower}{ext}":
+                print(f"Найдено: {f}")
                 return os.path.join(images_dir, f)
+    print(f"Не найдена картинка для {word}")
     return None
