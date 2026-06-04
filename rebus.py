@@ -343,3 +343,13 @@ def suggest_for_word(target_word: str, dict_file: str = "words.txt", letters_fil
         print(f"❌ Не найдено способов собрать '{target_word}'")
         return []
     return variants
+
+def find_image_case_insensitive(word, images_dir="images"):
+    """Ищет картинку без учёта регистра"""
+    if not os.path.exists(images_dir):
+        return None
+    for ext in ['.webrp', '.png', '.jpg', '.jpeg', '.webp']:
+        for f in os.listdir(images_dir):
+            if f.lower() == f"{word}{ext}".lower():
+                return os.path.join(images_dir, f)
+    return None
