@@ -638,56 +638,43 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Файл базы данных не найден")
 
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks
+    from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
     from io import BytesIO
     import random
-    import os
-    import traceback
-
-    try:
-        # 1. Отправляем сообщение о начале генерации
-        await update.message.reply_text("🔄 Генерация ребуса...")
-
-        dictionary = load_dictionary("words.txt")
-        if not dictionary:
-            await update.message.reply_text("❌ База слов пуста")
-            return
-
-        candidates = [w for w in dictionary if 3 <= len(w) <= 6]
-        if not candidates:
-            candidates = list(dictionary)
-
-        for attempt in range(20):
-            target_word = random.choice(candidates)
-            await update.message.reply_text(f"🔍 Пробую слово: {target_word}")
-
-            variants = split_into_parts(target_word, dictionary, max_parts=2)
-            if not variants:
-                continue
-
-            variant = variants[0]
-            expression = variant["expression"]
-            await update.message.reply_text(f"📝 Выражение: {expression}")
-
-            blocks_data = expression_to_blocks(expression)
-            all_good = True
-            for block in blocks_data:
-                word = block["word"]
-                found = False
-                for ext in ['.webrp', '.png', '.jpg', '.webp']:
-                    path = os.path.join("images", f"{word}{ext}")
-                    if os.path.exists(path):
-                        found = True
-                        break
-                if not found:
-                    all_good = False
-                    await update.message.reply_text(f"❌ Нет картинки для: {word}")
-                    break
-
-            if not all_good:
-                continue
-
-            # Генерируем картинку
+    
+    dictionary = load_dictionary("words.txt")
+    if not dictionary:
+        await update.message.reply_text("❌ База слов пуста")
+        return
+    
+    # Берём слова длиной 3-6 букв
+    candidates = [w for w in dictionary if 3 <= len(w) <= 6]
+    if not candidates:
+        candidates = list(dictionary)
+    
+    for _ in range(30):
+        target_word = random.choice(candidates)
+        
+        variants = split_into_parts(target_word, dictionary, max_parts=2)
+        if not variants:
+            continue
+        
+        variant = variants[0]
+        expression = variant["expression"]
+        
+        # Проверяем наличие картинок (без учёта регистра)
+        blocks_data = expression_to_blocks(expression)
+        all_good = True
+        for block in blocks_data:
+            word = block["word"]
+            if find_image_case_insensitive(word) is None:
+                all_good = False
+                break
+        
+        if not all_good:
+            continue
+        
+        try:
             img = draw_rebus_from_blocks(
                 blocks_data,
                 images_dir="images",
@@ -697,7 +684,7 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 letter_spacing_h=5,
                 letter_spacing_v=7
             )
-
+            
             if img:
                 bio = BytesIO()
                 img.save(bio, format="PNG")
@@ -708,14 +695,15 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
                 return
-            else:
-                await update.message.reply_text("❌ Ошибка генерации картинки (img is None)")
-
-        await update.message.reply_text("❌ Не удалось собрать ребус после 20 попыток")
-
-    except Exception as e:
-        error_msg = f"❌ Критическая ошибка:\n{str(e)}\n\n{traceback.format_exc()}"
-        await update.message.reply_text(error_msg[:4000])  # Telegram ограничение
+        except Exception as e:
+            print(f"Ошибка: {e}")
+            continue
+    
+    await update.message.reply_text(
+        "❌ *Не удалось собрать ребус*\n\n"
+        "Попробуй позже.",
+        parse_mode="Markdown"
+    )
 
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
