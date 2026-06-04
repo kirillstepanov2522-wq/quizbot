@@ -881,7 +881,44 @@ async def debug_rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         msg += f"❌ Ошибка генерации: {str(e)[:200]}\n{traceback.format_exc()[:500]}"
         await update.message.reply_text(msg)
+
+async def test_gen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from rebus import expression_to_blocks, draw_rebus_from_blocks
+    from io import BytesIO
+
+    # Простейший тестовый ребус
+    test_expr = "акула"
+    blocks = expression_to_blocks(test_expr)
     
+    if not blocks:
+        await update.message.reply_text("❌ Не удалось разобрать выражение")
+        return
+    
+    img = draw_rebus_from_blocks(
+        blocks,
+        images_dir="images",
+        font_path="fonts/minecraft.ttf",
+        frame_text="ТРЯСЛО993",
+        frame_padding=30,
+        letter_spacing_h=5,
+        letter_spacing_v=7
+    )
+    
+    if img is None:
+        await update.message.reply_text("❌ draw_rebus_from_blocks вернула None")
+        return
+    
+    # Проверяем размер
+    if img.width == 0 or img.height == 0:
+        await update.message.reply_text(f"❌ Картинка имеет нулевой размер: {img.width}x{img.height}")
+        return
+    
+    bio = BytesIO()
+    img.save(bio, format='PNG')
+    bio.seek(0)
+    
+    await update.message.reply_photo(bio, caption="Тестовая картинка")
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -907,6 +944,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("checkrebus", check_rebus))
     app.add_handler(CommandHandler("testpillow", test_pillow))
     app.add_handler(CommandHandler("debugrebus", debug_rebus))
+    app.add_handler(CommandHandler("testgen", test_gen))
+    
 
 
     
