@@ -776,6 +776,15 @@ async def test_rebus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg += f"❌ Ошибка разбиения: {e}\n"
     
     await update.message.reply_text(msg)
+
+async def check_rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        import rebus
+        await update.message.reply_text(f"✅ rebus найден! Функции: {', '.join([x for x in dir(rebus) if not x.startswith('_')][:10])}")
+    except ImportError as e:
+        await update.message.reply_text(f"❌ rebus НЕ загружен: {e}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
     
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
@@ -799,6 +808,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("rebus", rebus))
     app.add_handler(CommandHandler("checkdict", check_dict))
     app.add_handler(CommandHandler("testrb", test_rebus_logic))
+    app.add_handler(CommandHandler("checkrebus", check_rebus))
    
 
 
