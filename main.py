@@ -637,7 +637,6 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     else:
         await update.message.reply_text("❌ Файл базы данных не найден")
-
 async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary, split_into_parts, expression_to_blocks, draw_rebus_from_blocks, find_image_case_insensitive
     from io import BytesIO
@@ -648,12 +647,15 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ База слов пуста")
         return
     
+    # Берём слова длиной 3-6 букв
     candidates = [w for w in dictionary if 3 <= len(w) <= 6]
     if not candidates:
         candidates = list(dictionary)
     
-    for _ in range(20):
-        target_word = random.choice(candidates)
+    # Перемешиваем, чтобы не повторялись
+    random.shuffle(candidates)
+    
+    for target_word in candidates[:30]:  # пробуем первые 30
         variants = split_into_parts(target_word, dictionary, max_parts=2)
         if not variants:
             continue
@@ -662,6 +664,7 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         expression = variant["expression"]
         blocks_data = expression_to_blocks(expression)
         
+        # Проверяем наличие картинок
         missing = False
         for block in blocks_data:
             if find_image_case_insensitive(block["word"]) is None:
@@ -670,6 +673,7 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if missing:
             continue
         
+        # Генерируем картинку
         try:
             img = draw_rebus_from_blocks(
                 blocks_data,
@@ -685,31 +689,22 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bio = BytesIO()
                 img.save(bio, format='PNG')
                 bio.seek(0)
-                bio.name = 'rebus.png'  # даём имя файлу
                 
-                # Отправляем в кэш-канал
-                cached = await context.bot.send_photo(
-                    chat_id=CACHE_CHAT_ID,
-                    photo=bio,
-                    caption=f"Ребус для {update.effective_user.first_name}"
-                )
-                
-                # Получаем file_id из отправленного фото
-                file_id = cached.photo[-1].file_id
-                
-                # Отправляем пользователю по file_id
                 await update.message.reply_photo(
-                    photo=file_id,
+                    photo=bio,
                     caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
                     parse_mode="Markdown"
                 )
                 return
-                
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка при {target_word}: {e}")
             continue
     
-    await update.message.reply_text("❌ Не удалось собрать ребус")
+    await update.message.reply_text(
+        "❌ *Не удалось собрать ребус*\n\n"
+        "Попробуй позже.",
+        parse_mode="Markdown"
+    )
     
 async def check_dict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from rebus import load_dictionary
