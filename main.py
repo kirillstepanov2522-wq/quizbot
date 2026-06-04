@@ -64,6 +64,11 @@ def init_db():
                   quiz_id TEXT,
                   completed_at TIMESTAMP,
                   PRIMARY KEY (user_id, quiz_id))''')
+    # ===== НОВАЯ ТАБЛИЦА ДЛЯ РЕБУСОВ =====
+    c.execute('''CREATE TABLE IF NOT EXISTS rebus_solves
+                 (user_id INTEGER PRIMARY KEY,
+                  user_name TEXT,
+                  solves INTEGER DEFAULT 0)''')
     conn.commit()
     conn.close()
     print("✅ База данных инициализирована")
@@ -75,6 +80,18 @@ def has_completed(user_id, quiz_id):
     result = c.fetchone()
     conn.close()
     return result is not None
+
+def add_rebus_solve(user_id, user_name):
+    conn = sqlite3.connect('quiz_users.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO rebus_solves (user_id, user_name, solves)
+                 VALUES (?, ?, 1)
+                 ON CONFLICT(user_id) DO UPDATE SET
+                 solves = solves + 1,
+                 user_name = excluded.user_name''',
+              (user_id, user_name))
+    conn.commit()
+    conn.close()
 
 def add_completion(user_id, first_name, quiz_id):
     conn = sqlite3.connect('quiz_users.db')
@@ -1017,6 +1034,26 @@ async def check_rebus_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="Markdown"
         )
 
+@antispam_decorator
+async def rebus_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    conn = sqlite3.connect('quiz_users.db')
+    c = conn.cursor()
+    c.execute('''SELECT user_name, solves FROM rebus_solves
+                 ORDER BY solves DESC LIMIT 10''')
+    top = c.fetchall()
+    conn.close()
+    
+    if not top:
+        await update.message.reply_text("❌ Пока никто не отгадал ни одного ребуса")
+        return
+    
+    message = "🏆 *Топ ребусников:*\n\n"
+    for i, (name, solves) in enumerate(top, 1):
+        word = "ребус" if solves == 1 else "ребусов"
+        message += f"{i}. *{name}* — {solves} {word}\n"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -1047,6 +1084,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("checkbytes", check_bytes))
     app.add_handler(CommandHandler("allimg", list_all_images))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_rebus_answer))
+    app.add_handler(CommandHandler("rebustop", rebus_top))
 
 
     
