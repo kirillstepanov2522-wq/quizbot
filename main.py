@@ -1162,7 +1162,6 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_rebus_answer))
     app.add_handler(CommandHandler("rebustop", rebus_top))
     app.add_handler(CommandHandler("rebusbackup", rebus_backup))
-    app.add_handler(CommandHandler("restorerebusstats", restore_rebus_stats))
     app.add_handler(CommandHandler("editrebusstats", editrebusstats))
 
 
