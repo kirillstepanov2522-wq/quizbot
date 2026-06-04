@@ -62,8 +62,21 @@ def find_image_case_insensitive(word, images_dir="images"):
                 return os.path.join(images_dir, f)
     return None
 
+def find_image_case_insensitive(word, images_dir="images"):
+    if not os.path.exists(images_dir):
+        print(f"Папка {images_dir} не существует")
+        return None
+    word_lower = word.lower()
+    for ext in ['.webp', '.png', '.jpg', '.jpeg']:
+        for f in os.listdir(images_dir):
+            print(f"Сравниваем: f.lower() = {f.lower()}, ищем {word_lower}{ext}")
+            if f.lower() == f"{word_lower}{ext}":
+                print(f"Найдено: {f}")
+                return os.path.join(images_dir, f)
+    print(f"Не найдена картинка для {word}")
+    return None
+
 # ========== ГЕНЕРАЦИЯ КАРТИНКИ РЕБУСА ==========
-from rebus import find_image_case_insensitive
 def draw_rebus_from_blocks(blocks_data, output_path=None, images_dir="images", font_path=None, target_size=(150, 150), frame_text="ТРЯСЛО993", frame_padding=30, letter_spacing_h=5, letter_spacing_v=7):
     
     if not font_path:
@@ -343,17 +356,3 @@ def split_into_parts(word: str, dictionary: set, excluded_words: set = None, max
             seen_expr.add(v["expression"])
             unique_variants.append(v)
     return unique_variants
-
-def find_image_case_insensitive(word, images_dir="images"):
-    if not os.path.exists(images_dir):
-        print(f"Папка {images_dir} не существует")
-        return None
-    word_lower = word.lower()
-    for ext in ['.webp', '.png', '.jpg', '.jpeg']:
-        for f in os.listdir(images_dir):
-            print(f"Сравниваем: f.lower() = {f.lower()}, ищем {word_lower}{ext}")
-            if f.lower() == f"{word_lower}{ext}":
-                print(f"Найдено: {f}")
-                return os.path.join(images_dir, f)
-    print(f"Не найдена картинка для {word}")
-    return None
