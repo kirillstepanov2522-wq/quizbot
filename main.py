@@ -692,16 +692,19 @@ async def rebus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 img.save(bio, format='PNG')
                 bio.seek(0)
                 
-                await update.message.reply_photo(
+                sent_message = await update.message.reply_photo(
                     photo=bio,
                     caption=f"🧩 *Отгадай слово ({len(target_word)} букв)*\n\nПодсказка: первая буква — «{target_word[0]}»",
                     parse_mode="Markdown"
                 )
-                sent_message = await update.message.reply_photo(...)  # сохраняем в переменную
-active_rebuses[update.effective_user.id] = {
-    "word": target_word,
-    "message_id": sent_message.message_id
-}
+                
+                # Сохраняем активный ребус для проверки ответа
+                active_rebuses[update.effective_user.id] = {
+                    "word": target_word,
+                    "message_id": sent_message.message_id,
+                    "chat_id": update.message.chat_id
+                }
+                
                 return
         except Exception as e:
             print(f"Ошибка при {target_word}: {e}")
