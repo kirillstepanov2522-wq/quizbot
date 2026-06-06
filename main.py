@@ -1130,6 +1130,58 @@ async def rebus_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode="Markdown")
 
+@antispam_decorator
+async def restore_rebus_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔ Нет прав")
+        return
+    
+    reply = update.message.reply_to_message
+    if not reply or not reply.document:
+        await update.message.reply_text(
+            "❌ *Как восстановить:*\n"
+            "1. Отправь файл `rebus_backup.json`\n"
+            "2. Нажми на него → 'Ответить'\n"
+            "3. Напиши `/restorerebusstats`\n\n"
+            "📌 Команда должна быть ответом на сообщение с файлом!",
+            parse_mode="Markdown"
+        )
+        return
+    
+    file = await reply.document.get_file()
+    file_path = "restore_rebus.json"
+    await file.download_to_drive(file_path)
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        conn = sqlite3.connect('quiz_users.db')
+        c = conn.cursor()
+        
+        restored = 0
+        for item in data:
+            user_id = item["user_id"]
+            user_name = item["user_name"]
+            solves = item["solves"]
+            c.execute('''INSERT INTO rebus_solves (user_id, user_name, solves)
+                         VALUES (?, ?, ?)
+                         ON CONFLICT(user_id) DO UPDATE SET
+                         solves = excluded.solves,
+                         user_name = excluded.user_name''',
+                      (user_id, user_name, solves))
+            restored += 1
+        
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(f"✅ Восстановлено {restored} записей в топе ребусов")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка восстановления: {e}")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -1163,6 +1215,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("rebustop", rebus_top))
     app.add_handler(CommandHandler("rebusbackup", rebus_backup))
     app.add_handler(CommandHandler("editrebusstats", editrebusstats))
+    app.add_handler(CommandHandler("restorerebusstats", restore_rebus_stats))
 
 
     
