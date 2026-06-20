@@ -1182,6 +1182,64 @@ async def restore_rebus_stats(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists(file_path):
             os.remove(file_path)
 
+# ===== ОПРЕДЕЛЕНИЕ ТИПА ПОСТА =====
+def detect_post_type(text):
+    text_lower = text.lower()
+    if "викторина" in text_lower or "#квиз" in text_lower:
+        return "quiz"
+    elif "мем" in text_lower or "#мем" in text_lower:
+        return "meme"
+    else:
+        return "quiz"  # по умолчанию викторина
+
+# ===== ОБРАБОТЧИК ПЕРЕСЛАННЫХ ПОСТОВ =====
+async def handle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, что это пересылка
+    if not update.message.forward_origin:
+        await update.message.reply_text("❌ Перешлите пост из канала")
+        return
+    
+    # Пытаемся получить ID поста и канал
+    try:
+        origin = update.message.forward_origin
+        if hasattr(origin, 'chat') and origin.chat:
+            channel = origin.chat
+            channel_username = channel.username
+            post_id = origin.message_id
+        else:
+            await update.message.reply_text("❌ Не могу определить канал")
+            return
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:50]}")
+        return
+    
+    if not channel_username:
+        await update.message.reply_text("❌ У канала нет username, не могу создать ссылку")
+        return
+    
+    link = f"https://t.me/{channel_username}/{post_id}"
+    date = datetime.now().strftime("%Y-%m-%d")
+    text = update.message.caption or ""
+    
+    post_type = detect_post_type(text)
+    
+    if post_type == "quiz":
+        quizzes = load_quizzes()
+        if link not in [q["link"] for q in quizzes]:
+            quizzes.append({"link": link, "date": date})
+            save_quizzes(quizzes)
+            await update.message.reply_text(f"✅ Викторина добавлена!\n{link}")
+        else:
+            await update.message.reply_text("⚠️ Такая викторина уже есть")
+    else:
+        memes = load_memes()
+        if link not in [m["link"] for m in memes]:
+            memes.append({"link": link, "date": date})
+            save_memes(memes)
+            await update.message.reply_text(f"✅ Мем добавлен!\n{link}")
+        else:
+            await update.message.reply_text("⚠️ Такой мем уже есть")
+
 # ===== ЗАПУСК =====
 if __name__ == "__main__":
     init_db()
@@ -1216,6 +1274,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("rebusbackup", rebus_backup))
     app.add_handler(CommandHandler("editrebusstats", editrebusstats))
     app.add_handler(CommandHandler("restorerebusstats", restore_rebus_stats))
+    app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))
 
 
     
