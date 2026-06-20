@@ -1,14 +1,16 @@
 import asyncio
 import json
+import os
 from telethon import TelegramClient
 
-API_ID = 36564697
-API_HASH = "0e6f0a15f7f533106e2bd74bfab796fb"
-CHANNEL = "trassa993"
+API_ID = int(os.environ.get("API_ID", 1234567))
+API_HASH = os.environ.get("API_HASH", "твой_api_hash")
+CHANNEL = "@trassa993"
+PHONE_NUMBER = "+79625231378"  # ЗАМЕНИ НА СВОЙ НОМЕР
 
 async def main():
     client = TelegramClient("session", API_ID, API_HASH)
-    await client.start()
+    await client.start(phone=PHONE_NUMBER)
     
     print("🔍 Собираю правильные ответы...")
     
