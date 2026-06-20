@@ -1192,6 +1192,14 @@ def detect_post_type(text):
     else:
         return "quiz"  # по умолчанию викторина
 
+def save_quizzes(quizzes):
+    with open(QUIZ_FILE, "w", encoding="utf-8") as f:
+        json.dump(quizzes, f, ensure_ascii=False, indent=2)
+
+def save_memes(memes):
+    with open(MEMES_FILE, "w", encoding="utf-8") as f:
+        json.dump(memes, f, ensure_ascii=False, indent=2)
+
 # ===== ОБРАБОТЧИК ПЕРЕСЛАННЫХ ПОСТОВ =====
 async def handle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, что это пересылка
