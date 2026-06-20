@@ -1,4 +1,6 @@
 python-telegram-bot
 requests
 beautifulsoup4
-Pillow>=10.0.0
+Pillow
+rebus
+python-dotenv
