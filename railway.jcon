@@ -3,6 +3,6 @@
     "builder": "NIXPACKS"
   },
   "start": {
-    "worker": "python quiz_bot.py"
+    "worker": "python main.py"
   }
 }
